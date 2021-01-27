@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # install systemd service
-cp ebs-autoscale.service /usr/lib/systemd/system/ebs-autoscale.service
+cp ebs-autoscale.service /lib/systemd/system/ebs-autoscale.service
 
 # enable the service and start
 systemctl daemon-reload
