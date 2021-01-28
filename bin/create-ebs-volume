@@ -161,7 +161,7 @@ function get_next_logical_device() {
         # use /dev/xvdb* device names to avoid contention for /dev/sd* and /dev/xvda names
         # only supported by HVM instances
         if [ ! -b "${device}" ]; then
-            echo "${letter}"
+            echo "${device}"
             break
         fi
     done
