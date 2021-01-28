@@ -147,20 +147,21 @@ fi
 
 declare -A device_names
 
-device_name_map=( ['2']='a' ['3']='b' ['4']='c' )
+# mapping nvme device names to xvdb 
+device_name_map=( ['/dev/nvme2n1']='/dev/xvdba' ['/dev/nvme3n1']='/dev/xvdbb' ['/dev/nvme4n1']='/dev/xvdbc' ['/dev/nvme5n1']='/dev/xvdbd' ['/dev/nvme6n1']='/dev/xvdbe' )
 
 # alphabet=( {a..z} )
 
 function get_xvd_from_nvme() {
-    echo "/dev/xvdb${device_name_map[$1]}"
+    echo "${device_name_map[$1]}"
 }
 
 function get_next_logical_device() {
-    for letter in ${!device_name_map[@]}; do
+    for device in ${!device_name_map[@]}; do
         # use /dev/xvdb* device names to avoid contention for /dev/sd* and /dev/xvda names
         # only supported by HVM instances
-        if [ ! -b "/dev/nvme${letter}n1" ]; then
-            echo "/dev/nvme${letter}n1"
+        if [ ! -b "${device}" ]; then
+            echo "${letter}"
             break
         fi
     done
