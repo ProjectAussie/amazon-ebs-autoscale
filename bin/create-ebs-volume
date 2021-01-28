@@ -145,7 +145,7 @@ fi
 
 # -- Mike Zhong -- #
 
-declare -A device_names
+declare -A device_name_map
 
 # mapping nvme device names to xvdb 
 device_name_map=( ['/dev/nvme2n1']='/dev/xvdba' ['/dev/nvme3n1']='/dev/xvdbb' ['/dev/nvme4n1']='/dev/xvdbc' ['/dev/nvme5n1']='/dev/xvdbd' ['/dev/nvme6n1']='/dev/xvdbe' )
