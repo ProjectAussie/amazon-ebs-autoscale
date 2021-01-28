@@ -146,9 +146,13 @@ fi
 # -- Mike Zhong -- #
 
 declare -A device_name_map
+declare -a device_ordering
+
+# associative arrays do not care for your logical ordering so keep order here
+device_ordering=( '/dev/nvme1n1' '/dev/nvme2n1' '/dev/nvme3n1' '/dev/nvme4n1' '/dev/nvme5n1' '/dev/nvme6n1' )
 
 # mapping nvme device names to xvdb 
-device_name_map=( ['/dev/nvme2n1']='/dev/xvdba' ['/dev/nvme3n1']='/dev/xvdbb' ['/dev/nvme4n1']='/dev/xvdbc' ['/dev/nvme5n1']='/dev/xvdbd' ['/dev/nvme6n1']='/dev/xvdbe' )
+device_name_map=( ['/dev/nvme1n1']='/dev/xvdba' ['/dev/nvme2n1']='/dev/xvdbb' ['/dev/nvme3n1']='/dev/xvdbc' ['/dev/nvme4n1']='/dev/xvdbd' ['/dev/nvme5n1']='/dev/xvdbe' ['/dev/nvme6n1']='/dev/xvdbf')
 
 # alphabet=( {a..z} )
 
@@ -157,10 +161,12 @@ function get_xvd_from_nvme() {
 }
 
 function get_next_logical_device() {
-    for device in ${!device_name_map[@]}; do
+    for device in ${device_ordering[@]}; do
+        logthis "Trying $device"
         # use /dev/xvdb* device names to avoid contention for /dev/sd* and /dev/xvda names
         # only supported by HVM instances
         if [ ! -b "${device}" ]; then
+            logthis "Available device found $device"
             echo "${device}"
             break
         fi
@@ -325,7 +331,7 @@ function create_and_attach_volume() {
     fi
     set -e
 
-    logthis "waiting for volume $volume_id on filesystem"
+    logthis "waiting for volume $volume_id on filesystem, device $device, $xvd_device"
     while true; do
         if [ -e "$device" ]; then
             logthis "volume $volume_id on filesystem as $device, $xvd_device"
