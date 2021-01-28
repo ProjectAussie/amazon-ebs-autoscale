@@ -342,7 +342,7 @@ function create_and_attach_volume() {
     > /dev/null
     logthis "volume $volume_id DeleteOnTermination ENABLED"
 
-    echo $device, $xvd_device
+    echo $device
 }
 
 create_and_attach_volume
