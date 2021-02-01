@@ -1,5 +1,15 @@
 # Amazon Elastic Block Store Autoscale
 
+## Revisions made for Embark Veterinary
+
+EV uses a custom ubuntu based AMI with slight differences from the alinux2 AMI this was originally designed for. The differences are highlighted below and the scripts underpinning the service have been updated to accommodate:
+
+This repo is housed at `s3://source-code-for-download-by-ec2s/amazon-ebs-autoscale` and is synced and installed as part of the EC2 instance bootstrap process
+
+1. Device names using the Nitro system are named /dev/nvme{x}n1 where x is an integer. The root volume is 0, and it increases from there. The device name in AWS is /dev/sd{a1} or something similar. THis name is used to attach the volume to the instance, but the nvme device name is used to mount the volume to a directory. This has been addressed with a mapping from nvme -> xvdb names
+2. The systemd looks for services in `/lib/systemd/system` on our ami and in `/usr/lib/systemd/system` in alinux2. The install script was updated to cp the service to the correct location
+
+
 This is an example of a daemon process that monitors a filesystem mountpoint and automatically expands it when free space falls below a configured threshold. New [Amazon EBS](https://aws.amazon.com/ebs/) volumes are added to the instance as necessary and the underlying filesystem ([BTRFS](http://btrfs.wiki.kernel.org) or [LVM](https://en.wikipedia.org/wiki/Logical_Volume_Manager_(Linux)) with [ext4](https://en.wikipedia.org/wiki/Ext4)) expands as new devices are added.
 
 ## Assumptions:

@@ -143,14 +143,30 @@ if [[ ! "$SIZE" ]]; then
     error "missing required argument --size"
 fi
 
-alphabet=( {a..z} )
+# -- Mike Zhong -- #
+
+declare -A device_name_map
+declare -a device_ordering
+
+# associative arrays do not care for your logical ordering so keep order here
+device_ordering=( '/dev/nvme1n1' '/dev/nvme2n1' '/dev/nvme3n1' '/dev/nvme4n1' '/dev/nvme5n1' '/dev/nvme6n1' )
+
+# mapping nvme device names to xvdb because AWS uses /dev/xvdb* names to attach volumes
+# while the instance itself uses /dev/nvme* names to mount volumes and scan for available devices
+device_name_map=( ['/dev/nvme1n1']='/dev/xvdba' ['/dev/nvme2n1']='/dev/xvdbb' ['/dev/nvme3n1']='/dev/xvdbc' ['/dev/nvme4n1']='/dev/xvdbd' ['/dev/nvme5n1']='/dev/xvdbe' ['/dev/nvme6n1']='/dev/xvdbf')
+
+function get_xvd_from_nvme() {
+    echo "${device_name_map[$1]}"
+}
 
 function get_next_logical_device() {
-    for letter in ${alphabet[@]}; do
+    for device in ${device_ordering[@]}; do
+        logthis "Trying $device"
         # use /dev/xvdb* device names to avoid contention for /dev/sd* and /dev/xvda names
         # only supported by HVM instances
-        if [ ! -b "/dev/xvdb${letter}" ]; then
-            echo "/dev/xvdb${letter}"
+        if [ ! -b "${device}" ]; then
+            logthis "Available device found $device"
+            echo "${device}"
             break
         fi
     done
@@ -160,16 +176,6 @@ function create_and_attach_volume() {
     local instance_id=$(get_metadata instance-id)
     local availability_zone=$(get_metadata placement/availability-zone)
     local region=${availability_zone%?}
-
-    local instance_tags=""
-    # Render instance tags to match: --tag-specification
-    # Output Example:
-    # {Key=Name,Value=Jenkins},{Key=Owner,Value=DevOps}
-    instance_tags=$(
-      aws ec2 describe-tags \
-        --region $region \
-        --filters "Name=resource-id,Values=$instance_id" | jq -r .Tags | jq -c 'map({Key, Value})' | tr -d '[]"' | tr : =
-      )
 
     local max_attempts=10
     local attached_volumes=""
@@ -248,6 +254,9 @@ function create_and_attach_volume() {
     fi
     logthis "next available device: $device"
 
+    # -- Mike Zhong -- #
+
+    local xvd_device=$(get_xvd_from_nvme $device)
     # create the volume
     local tmpfile=$(mktemp /tmp/ebs-autoscale.create-volume.XXXXXXXXXX)
     local volume_opts="--size $SIZE --volume-type $TYPE"
@@ -262,7 +271,7 @@ function create_and_attach_volume() {
               --region $region \
               --availability-zone $availability_zone \
               $volume_opts \
-              --tag-specification "ResourceType=volume,Tags=[$instance_tags,{Key=source-instance,Value=$instance_id},{Key=amazon-ebs-autoscale-creation-time,Value=$timestamp}]" \
+              --tag-specification "ResourceType=volume,Tags=[{Key=source-instance,Value=$instance_id},{Key=amazon-ebs-autoscale-creation-time,Value=$timestamp}]" \
           2> $tmpfile
       )
 
@@ -304,7 +313,7 @@ function create_and_attach_volume() {
     sleep 1
     aws ec2 attach-volume \
         --region $region \
-        --device $device \
+        --device $xvd_device \
         --instance-id $instance_id \
         --volume-id $volume_id \
     > /dev/null
@@ -321,10 +330,10 @@ function create_and_attach_volume() {
     fi
     set -e
 
-    logthis "waiting for volume $volume_id on filesystem"
+    logthis "waiting for volume $volume_id on filesystem, device $device, $xvd_device"
     while true; do
         if [ -e "$device" ]; then
-            logthis "volume $volume_id on filesystem as $device"
+            logthis "volume $volume_id on filesystem as $device, $xvd_device"
             break
         fi
         sleep 1
@@ -334,7 +343,7 @@ function create_and_attach_volume() {
     aws ec2 modify-instance-attribute \
         --region $region \
         --instance-id $instance_id \
-        --block-device-mappings "DeviceName=$device,Ebs={DeleteOnTermination=true,VolumeId=$volume_id}" \
+        --block-device-mappings "DeviceName=$xvd_device,Ebs={DeleteOnTermination=true,VolumeId=$volume_id}" \
     > /dev/null
     logthis "volume $volume_id DeleteOnTermination ENABLED"
 
