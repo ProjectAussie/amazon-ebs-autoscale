@@ -151,10 +151,9 @@ declare -a device_ordering
 # associative arrays do not care for your logical ordering so keep order here
 device_ordering=( '/dev/nvme1n1' '/dev/nvme2n1' '/dev/nvme3n1' '/dev/nvme4n1' '/dev/nvme5n1' '/dev/nvme6n1' )
 
-# mapping nvme device names to xvdb 
+# mapping nvme device names to xvdb because AWS uses /dev/xvdb* names to attach volumes
+# while the instance itself uses /dev/nvme* names to mount volumes and scan for available devices
 device_name_map=( ['/dev/nvme1n1']='/dev/xvdba' ['/dev/nvme2n1']='/dev/xvdbb' ['/dev/nvme3n1']='/dev/xvdbc' ['/dev/nvme4n1']='/dev/xvdbd' ['/dev/nvme5n1']='/dev/xvdbe' ['/dev/nvme6n1']='/dev/xvdbf')
-
-# alphabet=( {a..z} )
 
 function get_xvd_from_nvme() {
     echo "${device_name_map[$1]}"
