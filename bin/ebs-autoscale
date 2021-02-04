@@ -95,49 +95,18 @@ get_num_devices() {
 calc_threshold() {
   # calculates percent utilization threshold for adding additional ebs volumes
   # as more ebs volumes are added, the threshold level increases
-
-  local num_devices=$(get_num_devices)
   local threshold=50
-
-  if [ "$num_devices" -ge "4" ] && [ "$num_devices" -le "6" ]; then
-    threshold=80
-  elif [ "$num_devices" -gt "6" ] && [ "$num_devices" -le "10" ]; then
-    threshold=90
-  elif [ "$num_devices" -gt "10" ]; then
-    threshold=90
-  else
-    threshold=50
-  fi
-
   echo ${threshold}
 }
 
 calc_new_size() {
   # calculates the size to use for new ebs volumes to expand space
   # new volume sizes increase as the number of attached volumes increase
-  
-  local num_devices=$(get_num_devices)
-  local new_size=150
-
-  if [ "$num_devices" -ge "4" ] && [ "$num_devices" -le "6" ]; then
-    new_size=300
-  elif [ "$num_devices" -gt "6" ] && [ "$num_devices" -le "10" ]; then
-    new_size=1000
-  elif [ "$num_devices" -gt "10" ]; then
-    new_size=1500
-  else
-    new_size=150
-  fi
-
+  local new_size=256
   echo ${new_size}
 }
 
 add_space () {
-  local num_devices=$(get_num_devices)
-  if [ "${num_devices}" -ge "$MAX_EBS_VOLUME_COUNT" ]; then
-    logthis "No more volumes can be safely added."
-    return 0
-  fi
 
   local curr_size=$(df -BG ${MOUNTPOINT} | grep ${MOUNTPOINT} | awk '{print $2} ' | cut -d'G' -f1)
   if [ "${curr_size}" -lt "$MAX_LOGICAL_VOLUME_SIZE" ]; then
@@ -184,7 +153,6 @@ DETECTION_INTERVAL=$(get_config_value .detection_interval)
 
 THRESHOLD=$(calc_threshold)
 while true; do
-  NUM_DEVICES=$(get_num_devices)
   STATS=$(df -BG  ${MOUNTPOINT} | grep -v Filesystem)
   TOTAL_SIZE=$(echo ${STATS} | awk '{print $2}')
   USED=$(echo ${STATS} | awk '{print $3}')
@@ -196,7 +164,7 @@ while true; do
     LOG_COUNT=LOG_INTERVAL
   fi
   if [ "${LOG_COUNT}" -ge "${LOG_INTERVAL}" ]; then
-    logthis "Devices ${NUM_DEVICES} : Size ${TOTAL_SIZE} : Used ${USED} : Available ${AVAILABLE} : Used% ${PCT_UTILIZATION}% : Threshold ${THRESHOLD}%"
+    logthis "Devices : Size ${TOTAL_SIZE} : Used ${USED} : Available ${AVAILABLE} : Used% ${PCT_UTILIZATION}% : Threshold ${THRESHOLD}%"
     LOG_COUNT=0
   fi
   THRESHOLD=$(calc_threshold)
