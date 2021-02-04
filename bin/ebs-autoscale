@@ -102,33 +102,15 @@ calc_threshold() {
 calc_new_size() {
   # calculates the size to use for new ebs volumes to expand space
   # new volume sizes increase as the number of attached volumes increase
-  
-  local num_devices=$1
-  local new_size=150
-
-  if [ "$num_devices" -ge "4" ] && [ "$num_devices" -le "6" ]; then
-    new_size=300
-  elif [ "$num_devices" -gt "6" ] && [ "$num_devices" -le "10" ]; then
-    new_size=1000
-  elif [ "$num_devices" -gt "10" ]; then
-    new_size=1500
-  else
-    new_size=150
-  fi
-
+  local new_size=256
   echo ${new_size}
 }
 
 add_space () {
-  local num_devices=$(get_num_devices)
-  if [ "${num_devices}" -ge "$MAX_EBS_VOLUME_COUNT" ]; then
-    logthis "No more volumes can be safely added."
-    return 0
-  fi
 
   local curr_size=$(df -BG ${MOUNTPOINT} | grep ${MOUNTPOINT} | awk '{print $2} ' | cut -d'G' -f1)
   if [ "${curr_size}" -lt "$MAX_LOGICAL_VOLUME_SIZE" ]; then
-    local vol_size=$(calc_new_size ${num_devices})
+    local vol_size=$(calc_new_size)
     logthis "Extending logical volume ${MOUNTPOINT} by ${vol_size}GB"
 
     DEVICE=$(${BASEDIR}/create-ebs-volume --size ${vol_size} --max-attached-volumes ${MAX_EBS_VOLUME_COUNT})
