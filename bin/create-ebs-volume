@@ -286,7 +286,7 @@ function create_and_attach_volume() {
             logthis "Could not modify-instance-attribute for volume $volume after $i attempts."
             break
         fi
-            sleep $(( 2 ** i ))
+        sleep $(( 2 ** i ))
 
     echo $device
 }
