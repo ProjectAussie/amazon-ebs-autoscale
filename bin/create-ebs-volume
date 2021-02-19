@@ -271,13 +271,22 @@ function create_and_attach_volume() {
         sleep 1
     done
 
-    # set volume delete on termination
-    aws ec2 modify-instance-attribute \
-        --region $region \
-        --instance-id $instance_id \
-        --block-device-mappings "DeviceName=$xvd_device,Ebs={DeleteOnTermination=true,VolumeId=$volume_id}" \
-    > /dev/null
-    logthis "volume $volume_id DeleteOnTermination ENABLED"
+    # set volume delete on termination, retry this with exponential backoff in the same manner as create-volume
+    for i in $(eval echo "{0..$max_attempts}") ; do
+        aws ec2 modify-instance-attribute \
+            --region $region \
+            --instance-id $instance_id \
+            --block-device-mappings "DeviceName=$xvd_device,Ebs={DeleteOnTermination=true,VolumeId=$volume_id}" \
+        > /dev/null
+
+        if [ $? -eq 0 ]; then
+            logthis "volume $volume_id DeleteOnTermination ENABLED"
+            break
+        elif [ $i -eq $max_attempts ]; then
+            logthis "Could not modify-instance-attribute for volume $volume after $i attempts."
+            break
+        fi
+            sleep $(( 2 ** i ))
 
     echo $device
 }

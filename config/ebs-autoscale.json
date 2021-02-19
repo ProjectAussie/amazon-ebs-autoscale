@@ -17,6 +17,6 @@
     },
     "logging": {
         "log_file": "/var/log/ebs-autoscale.log",
-        "log_interval": 300
+        "log_interval": 5
     }
 }
