@@ -283,7 +283,7 @@ function create_and_attach_volume() {
             logthis "volume $volume_id DeleteOnTermination ENABLED"
             break
         elif [ $i -eq $max_attempts ]; then
-            logthis "Could not modify-instance-attribute for volume $volume after $i attempts."
+            logthis "Could not modify-instance-attribute for volume $volume_id after $i attempts."
             break
         fi
         sleep $(( 2 ** i ))
