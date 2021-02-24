@@ -61,7 +61,7 @@ EOF
 )
 
 MOUNTPOINT=/scratch
-SIZE=256
+SIZE=100
 DEVICE=""
 FILE_SYSTEM=btrfs
 BASEDIR=$(dirname $0)
