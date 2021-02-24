@@ -252,13 +252,24 @@ function create_and_attach_volume() {
     
     status="$?"
     if [ ! "$status" -eq 0 ]; then
-        logthis "deleting volume $volume_id"
-        aws ec2 delete-volume \
-            --region $region \
-            --volume-id $volume_id \
-        > /dev/null
-        
         error "could not attach volume to instance"
+        
+        for i in $(eval echo "{0..$max_attempts}") ; do
+            logthis "attempting to delete volume $volume_id"
+            aws ec2 delete-volume \
+                --region $region \
+                --volume-id $volume_id \
+            > /dev/null
+
+            if [ $? -eq 0 ]; then
+                logthis "Successfully deleted volume $volume_id"
+                break
+            elif [ $i -eq $max_attempts ]; then
+                logthis "Failed to delete a volume after $i attempts. Volume: $volume_id"
+            break
+            fi
+            sleep $(( 2 ** i ))
+        done
     fi
     set -e
 
