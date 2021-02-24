@@ -254,6 +254,9 @@ function create_and_attach_volume() {
     if [ ! "$status" -eq 0 ]; then
         error "could not attach volume to instance"
         
+        # we have seen a massive proliferation of EBS volumes which are unattache. This is either because they are being made and failing to attach
+        # or they are made and attached but the "DeleteOnTermination" attribute is not being set correctly. This loop hopefully ensures the volumes
+        # which fail to attach are successfully deleted
         for i in $(eval echo "{0..$max_attempts}") ; do
             logthis "attempting to delete volume $volume_id"
             aws ec2 delete-volume \
@@ -271,7 +274,6 @@ function create_and_attach_volume() {
             sleep $(( 2 ** i ))
         done
     fi
-    set -e
 
     logthis "waiting for volume $volume_id on filesystem, device $device, $xvd_device"
     while true; do
@@ -299,6 +301,7 @@ function create_and_attach_volume() {
         fi
         sleep $(( 2 ** i ))
     done
+    set -e
 
     echo $device
 }
