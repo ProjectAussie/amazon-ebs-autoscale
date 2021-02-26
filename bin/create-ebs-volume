@@ -252,15 +252,28 @@ function create_and_attach_volume() {
     
     status="$?"
     if [ ! "$status" -eq 0 ]; then
-        logthis "deleting volume $volume_id"
-        aws ec2 delete-volume \
-            --region $region \
-            --volume-id $volume_id \
-        > /dev/null
-        
         error "could not attach volume to instance"
+        
+        # we have seen a massive proliferation of EBS volumes which are unattache. This is either because they are being made and failing to attach
+        # or they are made and attached but the "DeleteOnTermination" attribute is not being set correctly. This loop hopefully ensures the volumes
+        # which fail to attach are successfully deleted
+        for i in $(eval echo "{0..$max_attempts}") ; do
+            logthis "attempting to delete volume $volume_id"
+            aws ec2 delete-volume \
+                --region $region \
+                --volume-id $volume_id \
+            > /dev/null
+
+            if [ $? -eq 0 ]; then
+                logthis "Successfully deleted volume $volume_id"
+                break
+            elif [ $i -eq $max_attempts ]; then
+                logthis "Failed to delete a volume after $i attempts. Volume: $volume_id"
+            break
+            fi
+            sleep $(( 2 ** i ))
+        done
     fi
-    set -e
 
     logthis "waiting for volume $volume_id on filesystem, device $device, $xvd_device"
     while true; do
@@ -271,13 +284,24 @@ function create_and_attach_volume() {
         sleep 1
     done
 
-    # set volume delete on termination
-    aws ec2 modify-instance-attribute \
-        --region $region \
-        --instance-id $instance_id \
-        --block-device-mappings "DeviceName=$xvd_device,Ebs={DeleteOnTermination=true,VolumeId=$volume_id}" \
-    > /dev/null
-    logthis "volume $volume_id DeleteOnTermination ENABLED"
+    # set volume delete on termination, retry this with exponential backoff in the same manner as create-volume
+    for i in $(eval echo "{0..$max_attempts}") ; do
+        aws ec2 modify-instance-attribute \
+            --region $region \
+            --instance-id $instance_id \
+            --block-device-mappings "DeviceName=$xvd_device,Ebs={DeleteOnTermination=true,VolumeId=$volume_id}" \
+        > /dev/null
+
+        if [ $? -eq 0 ]; then
+            logthis "volume $volume_id DeleteOnTermination ENABLED"
+            break
+        elif [ $i -eq $max_attempts ]; then
+            logthis "Could not modify-instance-attribute for volume $volume_id after $i attempts."
+            break
+        fi
+        sleep $(( 2 ** i ))
+    done
+    set -e
 
     echo $device
 }
