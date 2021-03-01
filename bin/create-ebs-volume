@@ -196,6 +196,9 @@ function create_and_attach_volume() {
     if [ "$ENCRYPTED" == "1" ]; then volume_opts="$volume_opts --encrypted"; fi
     local timestamp=$(date "+%F %T UTC%z")  # YYYY-mm-dd HH:MM:SS UTC+0000
 
+    # bug in aws original script, this retry doesn't work without set +e
+    # it would just fail and try the whole process again at the next detection interval
+    set +e
     local volume=""
     for i in $(eval echo "{0..$max_attempts}") ; do
       local volume=$(\
@@ -213,7 +216,7 @@ function create_and_attach_volume() {
           logthis "Could not create a volume after $i attempts. Last response was: $volume"
           break
       fi
-      sleep $(( 2 ** i ))
+      sleep $(( 2 ** (i+1) ))
     done
 
     local volume_id=`echo $volume | jq -r '.VolumeId'`
@@ -239,22 +242,33 @@ function create_and_attach_volume() {
 
     # Need to assure that the created volume is successfully attached to be
     # cost efficient.  If attachment fails, delete the volume.
-    set +e
     logthis "attaching volume $volume_id"
 
     sleep 1
-    aws ec2 attach-volume \
-        --region $region \
-        --device $xvd_device \
-        --instance-id $instance_id \
-        --volume-id $volume_id \
-    > /dev/null
+    for i in $(eval echo "{0..$max_attempts}") ; do
+        aws ec2 attach-volume \
+            --region $region \
+            --device $xvd_device \
+            --instance-id $instance_id \
+            --volume-id $volume_id \
+        > /dev/null
+        status="$?"
+
+        if [ "$status" -eq 0 ]; then
+            logthis "Successfully attached volume $volume_id"
+            break
+        elif [ $i -eq $max_attempts ]; then
+            logthis "Failed to attach volume after $i attempts. Volume: $volume_id"
+            logthis "Proceeding to delete volume..."
+            break
+        fi
+        sleep $(( 2 ** (i+2)))
+    done
     
-    status="$?"
     if [ ! "$status" -eq 0 ]; then
-        error "could not attach volume to instance"
+        logthis "could not attach volume to instance"
         
-        # we have seen a massive proliferation of EBS volumes which are unattache. This is either because they are being made and failing to attach
+        # we have seen a massive proliferation of EBS volumes which are unattached. This is either because they are being made and failing to attach
         # or they are made and attached but the "DeleteOnTermination" attribute is not being set correctly. This loop hopefully ensures the volumes
         # which fail to attach are successfully deleted
         for i in $(eval echo "{0..$max_attempts}") ; do
@@ -269,9 +283,9 @@ function create_and_attach_volume() {
                 break
             elif [ $i -eq $max_attempts ]; then
                 logthis "Failed to delete a volume after $i attempts. Volume: $volume_id"
-            break
+                break
             fi
-            sleep $(( 2 ** i ))
+            sleep $(( 2 ** (i+5) ))
         done
     fi
 
@@ -299,7 +313,7 @@ function create_and_attach_volume() {
             logthis "Could not modify-instance-attribute for volume $volume_id after $i attempts."
             break
         fi
-        sleep $(( 2 ** i ))
+        sleep $(( 2 ** (i+5) ))
     done
     set -e
 
